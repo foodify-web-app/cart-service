@@ -1,1 +1,3 @@
-# cart-service
+# foodify
+
+Food ordering website
