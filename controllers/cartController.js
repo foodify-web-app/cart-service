@@ -1,15 +1,26 @@
-import foodModel from "../models/foodModel.js";
-import userModel from "../models/userModel.js";
-
+import axios from "axios";
+import dotenv from "dotenv";
+dotenv.config();
+const user_service_url = process.env['user-service'];
+const dish_service_url = process.env['dish-service'];
 // add item to user cart
 const addToCart = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.body.userId);
-    let cartData = await userData.cartData;
+    let cartData = {};
+    try {
+      let userData = await axios.get(`${user_service_url}/${req.body.userId}`, { headers: { 'token': req.headers.token } });
+      cartData = userData.data.data.cartData;
+    } catch (error) {
+      return res.json({ success: false, message: "User not found", error: error.message });
+    }
 
-    const dish = await foodModel.findById(req.body.itemId);
-    if (dish == null) {
-      return res.json({ success: false, message: "Dish not found" });
+    try {
+      const dish = await axios.get(`${dish_service_url}/${req.body.itemId}`);
+      if (dish == null) {
+        return res.json({ success: false, message: "Dish not found" });
+      }
+    } catch (error) {
+      return res.json({ success: false, message: "Dish not found", error: error.message });
     }
 
     if (!cartData[req.body.itemId]) {
@@ -17,11 +28,12 @@ const addToCart = async (req, res) => {
     } else {
       cartData[req.body.itemId] += 1;
     }
-    await userModel.findByIdAndUpdate(req.body.userId, { cartData });
+
+    await axios.put(`${user_service_url}/update/${req.body.userId}`, { cartData }, { headers: { 'token': req.headers.token } });
     return res.json({ success: true, message: "Added to Cart" });
+
   } catch (error) {
-    console.log(error);
-    return res.json({ success: false, message: "Error" });
+    return res.json({ success: false, message: "Error to add to cart", error: error.message });
   }
 };
 
@@ -29,10 +41,11 @@ const addToCart = async (req, res) => {
 
 const removeFromCart = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.body.userId);
-    let cartData = await userData.cartData;
+    let userData = await axios.get(`${user_service_url}/${req.body.userId}`, { headers: { 'token': req.headers.token } });
+    let cartData = await userData.data.data.cartData;
 
-    const dish = await foodModel.findById(req.body.itemId);
+    const dish = await axios.get(`${dish_service_url}/${req.body.itemId}`);
+    
     if (dish == null) {
       return res.json({ success: false, message: "Dish not found" });
     }
@@ -41,7 +54,7 @@ const removeFromCart = async (req, res) => {
       cartData[req.body.itemId] -= 1;
     }
 
-    await userModel.findByIdAndUpdate(req.body.userId, { cartData });
+    await axios.put(`${user_service_url}/update/${req.body.userId}`, { cartData }, { headers: { 'token': req.headers.token } });
     res.json({ success: true, message: "Removed from Cart" });
   } catch (error) {
     console.log(error);
@@ -53,29 +66,28 @@ const removeFromCart = async (req, res) => {
 
 const getCartByUserId = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.params.id);
-    let cartData = await userData.cartData;
+    let userData = await axios.get(`${user_service_url}/${req.params.id}`, { headers: { 'token': req.headers.token } });
+    let cartData = await userData.data.data.cartData;
     res.json({ success: true, cartData });
   } catch (error) {
-    console.log(error);
-    res.json({ success: false, message: "Error" });
+    res.json({ success: false, message: "Error to fetch cart data", error: error.message });
   }
 };
 
 const getItemsListByUserId = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.params.id);
-    let cartData = await userData.cartData;
+    let userData = await axios.get(`${user_service_url}/${req.params.id}`, { headers: { 'token': req.headers.token } });
+    let cartData = await userData.data.data.cartData;
 
     const newArray = await Promise.all(
       Object.entries(cartData).map(async ([key, value]) => {
         console.log(value)
         if (value == 0) return {}; // Handle zero quantity case
-        const dish = await foodModel.findById(key);
-        console.log(dish) // Await the database call
+        const dish = await axios.get(`${dish_service_url}/${key}`);
+        
         if (dish == null) return {};
         return {
-          ...dish._doc, // Ensure dish is converted to a plain object
+          ...dish.data.data, // Ensure dish is converted to a plain object
           quantity: value,
         };
       })
