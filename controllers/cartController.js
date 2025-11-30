@@ -111,7 +111,7 @@ const getItemsListByUserId = async (req, res) => {
 
         if (dish == null) return {};
         return {
-          ...dish.data.data[0], // Ensure dish is converted to a plain object
+          ...dish.data.data, // Ensure dish is converted to a plain object
           quantity: value,
         };
       })
